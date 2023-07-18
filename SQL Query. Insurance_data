@@ -1,0 +1,264 @@
+/*Problem 1:
+Show records of 'male' patient from 'southwest' region.*/
+
+Select * from insurance_data 
+where gender="male" and region="southwest";
+
+/*Problem 2:
+Show all records having bmi in range 30 to 45 both inclusive.*/
+Select * from insurance_data 
+where bmi>= 30 and bmi<= 45;
+
+
+/*Problem 3:
+Show minimum and maximum bloodpressure of diabetic patient who smokes. Make column names as MinBP and MaxBP respectively.*/
+
+select min(bloodpressure) as minbp, max(bloodpressure) as maxbp
+from insurance_data 
+where smoker="yes" and diabetic="yes";
+
+/*Problem 4:
+Find no of unique patients who are not from southwest region.*/
+Select count(distinct patientid) from insurance_data 
+where region <>"southwest";
+
+/*Problem 5:
+Total claim amount from male smoker.*/
+Select round(sum(claim),2) as total_claim_by_male from insurance_data 
+where gender="male";
+
+/*Problem 6:
+Select all records of south region.*/
+Select * from insurance_data 
+where region like "south%";
+
+/*Problem 7:
+No of patient having normal blood pressure. Normal range[90-120]*/
+Select count(distinct patientid) from insurance_data 
+where bloodpressure between 90 and 120;
+
+/*Problem 8:
+No of pateint belo 17 years of age having normal blood pressure as per below formula -
+
+BP normal range = 80+(age in years × 2) to 100 + (age in years × 2)*/
+SELECT COUNT(*) FROM insurance_data 
+WHERE age < 17 
+AND (bloodpressure BETWEEN 80+(age * 2) AND 100 + (age * 2));
+
+
+
+/*Problem 9:
+What is the average claim amount for non-smoking female patients who are diabetic?*/
+Select round(avg(claim),2) as avg_claim from insurance_data
+where gender='female' and smoker='yes' and diabetic='yes';
+
+/*Problem 10:
+Write a SQL query to update the claim amount for the patient with PatientID = 1234 to 5000 */
+UPDATE insurance_data SET claim = 5000
+WHERE PatientID = 1234;
+  
+/*Problem 11:
+Write a SQL query to delete all records for patients who are smokers and have no children.*/
+DELETE FROM insurance_data
+WHERE smoker = 'Yes' AND children = 0;
+
+
+
+/* Problem 12:
+What are the top 5 patients who claimed the highest insurance amounts?*/
+
+SELECT patientid, SUM(claim) AS total_claim
+FROM insurance_data
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 5;
+
+
+Select * from(SELECT patientid,SUM(claim) AS total_claim,
+       RANK() OVER (ORDER BY SUM(claim) DESC) AS claim_rank
+FROM insurance_data
+GROUP BY patientid)t 
+where t.claim_rank<6;
+
+
+/* Problem 13:
+What is the average insurance claimed by patients based on the number of children they have?*/
+
+Select children as number_of_children, round(avg(Claim),2) as avg
+from insurance_data
+group by 1;
+
+
+/* Problem 14:
+What is the highest and lowest claimed amount by patients in each region?*/
+Select region, Max(claim) as highest_claim,min(claim) as lowest_claim
+from insurance_data
+group by 1;
+
+/*Problem 15:
+What is the percentage of smokers in each age group?*/
+SELECT age_group, COUNT(*) AS total_count,
+       COUNT(CASE WHEN smoker = 'yes' THEN 1 END) AS smoker_count,
+       (COUNT(CASE WHEN smoker = 'yes' THEN 1 END) / COUNT(*) * 100) AS smoker_percentage
+FROM (
+    SELECT CASE
+        WHEN age >= 18 AND age <= 25 THEN '18-25'
+        WHEN age >= 26 AND age <= 35 THEN '26-35'
+        WHEN age >= 36 AND age <= 45 THEN '36-45'
+        ELSE '45+' END AS age_group,
+        smoker
+    FROM insurance_data
+) AS subquery
+GROUP BY age_group;
+
+
+/* Problem 16:
+What is the difference between the claimed amount of each patient and the first claimed amount of that patient?*/
+
+
+/*Problem 17:
+For each patient, calculate the difference between their claimed amount and the average claimed amount of patients with the same number of children*/
+
+
+SELECT 
+  p.patientid,
+  p.children,
+  p.claim, 
+  c.avg_claimed_amount,
+  p.claim- avg(c.avg_claimed_amount) AS difference
+FROM insurance_data p
+JOIN (
+  SELECT 
+    children,
+    AVG(claim) AS avg_claimed_amount
+  FROM insurance_data
+  GROUP BY children
+) c ON p.children = c.children
+GROUP BY p.patientid, p.claim, p.children;
+
+
+
+/*Problem 18:
+Show the patient with the highest BMI in each region and their respective rank.*/
+
+select * from(Select *, rank() over(partition by region order by bmi desc) as group_rank,
+rank() over(order by bmi) as all_rank
+from insurance_data)t 
+where t.group_rank=1;
+
+
+
+
+/* Problem 19:
+Calculate the difference between the claimed amount of each patient and the claimed amount of the patient who has the highest BMI in their region.*/
+
+
+SELECT patientid,region,claim,
+ FIRST_VALUE(claim) OVER(PARTITION BY region ORDER BY bmi DESC) as Higest_besed_on_bmi,
+claim - FIRST_VALUE(claim) OVER(PARTITION BY region ORDER BY bmi DESC) as difference
+FROM insurance_data;
+
+
+
+
+/*Problem 20:
+For each patient, calculate the difference in claim amount between the patient and the patient with the highest claim amount among patients with the same bmi and smoker status, within the same region. Return the result in descending order difference.*/
+SELECT *,
+(MAX(claim) OVER(PARTITION BY region,smoker) - claim) AS claim_diff
+FROM insurance_data
+ORDER BY claim_diff DESC;
+
+
+SELECT *,
+MAX(claim) OVER(PARTITION BY region,smoker)
+FROM insurance_data;
+
+
+
+/*Problem 21:
+For each patient, find the maximum BMI value among their next three records (ordered by age).*/
+SELECT *,
+MAX(bmi) OVER(ORDER BY age ROWS BETWEEN 1 FOLLOWING AND 3 FOLLOWING) as 3_following
+FROM insurance_data;
+
+
+/*Problem 22:
+For each patient, find the rolling average of the last 2 claims.*/
+SELECT *,
+AVG(claim) OVER(ROWS BETWEEN 2 PRECEDING AND 1 PRECEDING)
+FROM insurance_data;
+
+
+
+/*Problem 23:
+Find the first claimed insurance value for male and female patients, within each region order the data by patient age in ascending order, and only include patients who are non-diabetic and have a bmi value between 25 and 30.*/
+
+WITH filtered_data AS (
+	SELECT * FROM insurance_data
+    WHERE diabetic = 'No' AND bmi BETWEEN 25 AND 30
+)
+
+SELECT region,gender,first_claim FROM (SELECT *,
+FIRST_VALUE(claim) OVER(PARTITION BY region,gender ORDER BY age) AS first_claim,
+ROW_NUMBER() OVER(PARTITION BY region,gender ORDER BY age) AS row_num
+FROM filtered_data) t
+WHERE t.row_num = 1;
+
+SELECT id, MIN(id) OVER (ORDER BY id ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS min_current_and_preceding_two
+FROM nmbr;
+
+/*Problem 24:
+What is the maximum id value in the row two positions ahead of the current row and the row immediately following it?*/
+SELECT id, MAX(id) OVER (ORDER BY id ROWS BETWEEN 2 FOLLOWING AND 2 FOLLOWING)+ MAX(id) OVER (ORDER BY id ROWS BETWEEN 2 PRECEDING AND 2 PRECEDING) AS max_two_ahead_and_following
+FROM nmbr;
+
+
+/*Problem 25
+How many patients have claimed more than the average claim amount for patients who are smokers and have at least one child, and belong to the southeast region?*/
+Select count(*) from insurance_data 
+where claim>( Select avg(claim) from insurance_data
+             where smoker="yes" and children>=1 and region= "southeast");
+/*Problem 26
+How many patients have claimed more than the average claim amount for patients who are not smokers and have a BMI greater than the average BMI for patients who have at least one child?*/
+SELECT COUNT(claim) FROM insurance_data 
+WHERE claim > (SELECT AVG(claim) FROM insurance_data 
+				WHERE smoker = 'No' AND
+				bmi > (SELECT AVG(bmi) FROM insurance_data
+						WHERE children >= 1));
+                                          
+
+                                          
+
+/*Problem 27
+How many patients have claimed more than the average claim amount for patients who have a BMI greater than the 
+average BMI for patients who are diabetic, have at least one child, and are from the southwest region?*/
+
+Select count(*) from insurance_data where claim>
+                                               (Select avg(claim) from insurance_data where bmi>
+                                               (Select avg(bmi) from insurance_data 
+                                                     where diabetic="yes" and children>=1 and region="southwest"));
+
+/*Problem 28:
+What is the difference in the average claim amount between patients who are smokers
+and patients who are non-smokers, and have the same BMI and number of children?*/
+  
+  SELECT AVG(ABS(A.claim - B.claim)) AS avg_claim_difference
+FROM insurance_data A
+JOIN insurance_data B
+ON A.bmi = B.bmi
+AND A.smoker != B.smoker 
+AND A.children = B.children;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
